@@ -1,0 +1,7 @@
+{
+  "domain": "lema",
+  "name": "LEMA",
+  "documentation": "https://www.home-assistant.io/integrations/lema",
+  "requirements": ["aiocoap==0.4b2"],
+  "codeowners": ["@chrysn"]
+}
