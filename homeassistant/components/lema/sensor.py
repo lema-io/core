@@ -22,6 +22,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.const import ATTR_NAME, DEVICE_DEFAULT_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ PLATFORM_SCHEMA = vol.All(
             vol.Required(CONF_HOST): cv.string,
             # vol.Optional(CONF_SSL, default=False): cv.boolean,
             # vol.Optional(CONF_VERIFY_SSL, default=True): cv.boolean,
-            vol.Required(CONF_PASSWORD): cv.string
+            # vol.Required(CONF_PASSWORD): cv.string
             # vol.Optional(CONF_GROUP, default=GROUPS[0]): vol.In(GROUPS),
             # vol.Optional(CONF_SENSORS, default=[]): vol.Any(
             #    cv.schema_with_slug_keys(cv.ensure_list),  # will be deprecated
@@ -79,7 +80,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     # Setup Async CoAP
     protocol = await Context.create_client_context()
 
-    hass_sensors.append(LEMAOffGrid("led/blue", host, protocol))
+    hass_sensors.append(LEMAOffGrid(host, "led/blue", protocol))
 
     async_add_entities(hass_sensors)
 
@@ -107,7 +108,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 class LEMAOffGrid(Entity):
     """Representation of a LEMA Off-Grid Solar Power Supply."""
 
-    def __init__(self, uri, host, protocol):
+    def __init__(self, host, uri, protocol):
         """Initialize the sensor."""
         self._uri = uri
         self._name = "lema-off-grid"
@@ -181,3 +182,56 @@ class LEMAOffGrid(Entity):
     def unique_id(self):
         """Return a unique identifier for this sensor."""
         return f"leam-{self._uri}-{self._name}"
+
+
+class IOSwitch(ToggleEntity):
+    """Representation of a Digital Output."""
+
+    def __init__(self, host, uri, name, invert_logic):
+        """Initialize the pin."""
+        self._host = host
+        self._uri = uri
+        self._name = name or DEVICE_DEFAULT_NAME
+        self._invert_logic = invert_logic
+        self._state = False
+        rpi_pfio.write_output(self._uri, 1 if self._invert_logic else 0)
+
+    @property
+    def name(self):
+        """Return the name of the switch."""
+        return self._name
+
+    @property
+    def should_poll(self):
+        """Return the polling state."""
+        return False
+
+    @property
+    def is_on(self):
+        """Return true if device is on."""
+        return self._state
+
+    def turn_on(self, **kwargs):
+        """Turn the device on."""
+        rpi_pfio.write_output(self._uri, 0 if self._invert_logic else 1)
+        self._state = True
+        self.schedule_update_ha_state()
+
+    def turn_off(self, **kwargs):
+        """Turn the device off."""
+
+        request = Message(code=PUT, value="0", uri="coap://" + self._host + self._uri)
+
+        try:
+            response = await self._protocol.request(request).response
+        except Exception as e:
+            print("Failed to fetch resource:")
+            print(e)
+        else:
+            print("Result: %s\n%r" % (response.code, response.payload))
+
+
+        rpi_pfio.write_output(self._uri, 1 if self._invert_logic else 0)
+        self._state = False
+        self.schedule_update_ha_state()
+
