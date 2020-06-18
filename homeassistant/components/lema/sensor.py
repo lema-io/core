@@ -14,6 +14,10 @@ from homeassistant.const import (
     CONF_FRIENDLY_NAME,
     CONF_SCAN_INTERVAL,
     POWER_WATT,
+    VOLT,
+    UNIT_PERCENTAGE,
+    TIME_SECONDS,
+    TEMP_CELSIUS,
     ENERGY_KILO_WATT_HOUR,
     EVENT_HOMEASSISTANT_STOP,
 )
@@ -58,8 +62,20 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     protocol = await Context.create_client_context()
 
     # Add sensors
-    hass_sensors.append(LEMAOffGridSensor(host, "led/blue", protocol, config.get(CONF_FRIENDLY_NAME) + " - Blue Led", None))
-    hass_sensors.append(LEMAOffGridSensor(host, "inv/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Out Watts", POWER_WATT))
+    #hass_sensors.append(LEMAOffGridSensor(host, "led/blue", protocol, config.get(CONF_FRIENDLY_NAME) + " - Blue Led", None))
+    hass_sensors.append(LEMAOffGridSensor(host, "inv/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Watts", POWER_WATT))
+    hass_sensors.append(LEMAOffGridSensor(host, "inv/vac", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Volts AC", "VAC"))
+    hass_sensors.append(LEMAOffGridSensor(host, "inv/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Amps", "Amps"))
+    hass_sensors.append(LEMAOffGridSensor(host, "cc/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - PV Watts", POWER_WATT))
+    hass_sensors.append(LEMAOffGridSensor(host, "cc/v", protocol, config.get(CONF_FRIENDLY_NAME) + " - PV Volts DC", VOLT))
+    hass_sensors.append(LEMAOffGridSensor(host, "cc/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - PV Amps", "Amps"))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Watts", POWER_WATT))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Amps", "Amps"))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/v", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Volts DC", VOLT))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Amps", "Amps"))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/level_percent", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Level Percent", UNIT_PERCENTAGE))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/time_remaining_s", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Time Remaining", TIME_SECONDS))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/temperature_deg_c", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Temperature", TEMP_CELSIUS))
 
     async_add_entities(hass_sensors)
 
