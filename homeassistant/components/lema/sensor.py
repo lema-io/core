@@ -63,19 +63,19 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
     # Add sensors
     #hass_sensors.append(LEMAOffGridSensor(host, "led/blue", protocol, config.get(CONF_FRIENDLY_NAME) + " - Blue Led", None))
-    hass_sensors.append(LEMAOffGridSensor(host, "inv/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Watts", POWER_WATT))
-    hass_sensors.append(LEMAOffGridSensor(host, "inv/vac", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Volts AC", "VAC"))
-    hass_sensors.append(LEMAOffGridSensor(host, "inv/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Amps", "Amps"))
-    hass_sensors.append(LEMAOffGridSensor(host, "cc/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - PV Watts", POWER_WATT))
-    hass_sensors.append(LEMAOffGridSensor(host, "cc/v", protocol, config.get(CONF_FRIENDLY_NAME) + " - PV Volts DC", VOLT))
-    hass_sensors.append(LEMAOffGridSensor(host, "cc/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - PV Amps", "Amps"))
-    hass_sensors.append(LEMAOffGridSensor(host, "bat/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Watts", POWER_WATT))
-    hass_sensors.append(LEMAOffGridSensor(host, "bat/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Amps", "Amps"))
-    hass_sensors.append(LEMAOffGridSensor(host, "bat/v", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Volts DC", VOLT))
-    hass_sensors.append(LEMAOffGridSensor(host, "bat/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Amps", "Amps"))
-    hass_sensors.append(LEMAOffGridSensor(host, "bat/level_percent", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Level Percent", UNIT_PERCENTAGE))
-    hass_sensors.append(LEMAOffGridSensor(host, "bat/time_remaining_s", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Time Remaining", TIME_SECONDS))
-    hass_sensors.append(LEMAOffGridSensor(host, "bat/temperature_deg_c", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Temperature", TEMP_CELSIUS))
+    hass_sensors.append(LEMAOffGridSensor(host, "inv/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Watts", POWER_WATT, 0))
+    hass_sensors.append(LEMAOffGridSensor(host, "inv/vac", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Volts AC", "VAC", 1))
+    hass_sensors.append(LEMAOffGridSensor(host, "inv/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Inverter Amps", "Amps", 1))
+    hass_sensors.append(LEMAOffGridSensor(host, "cc/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - PV Watts", POWER_WATT, 0))
+    hass_sensors.append(LEMAOffGridSensor(host, "cc/v", protocol, config.get(CONF_FRIENDLY_NAME) + " - PV Volts DC", VOLT, 2))
+    hass_sensors.append(LEMAOffGridSensor(host, "cc/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - PV Amps", "Amps", 1))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Watts", POWER_WATT, 0))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Amps", "Amps", 1))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/v", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Volts DC", VOLT, 1))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Amps", "Amps", 1))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/level_percent", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Level Percent", UNIT_PERCENTAGE, 1))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/time_remaining_s", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Time Remaining", TIME_SECONDS, 0))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/temperature_deg_c", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Temperature", TEMP_CELSIUS, 1))
 
     async_add_entities(hass_sensors)
 
@@ -101,11 +101,12 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 class LEMAOffGridSensor(Entity):
     """Representation of a LEMA Off-Grid Solar Power Supply Sensor."""
 
-    def __init__(self, host, uri, protocol, name, unit):
+    def __init__(self, host, uri, protocol, name, unit, round_places):
         """Initialize the sensor."""
         self._uri = uri
         self._name = name
         self._unit = unit
+        self._round_places = round_places
         self._state = "0.0"
         self._host = host
         self._protocol = protocol
@@ -139,8 +140,9 @@ class LEMAOffGridSensor(Entity):
 
             # Check for change
             if (self._state != float(response.payload)):
-                self._state = float(response.payload)
-                _LOGGER.info("%s changed: %s - %r" % (self._uri, response.code, response.payload))
+                # Round result to make the ui look nice
+                self._state = round(float(response.payload), self._round_places)
+                _LOGGER.info("%s changed: %s - %r" % (self._uri, response.code, self._state))
                 self.async_write_ha_state()
             else:
                 _LOGGER.info("%s no change... current value = %s" % (self._uri, self._state))
