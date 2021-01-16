@@ -9,16 +9,18 @@ from pyhap.const import (
     CATEGORY_SWITCH,
 )
 
-from homeassistant.components.script import ATTR_CAN_CANCEL
 from homeassistant.components.switch import DOMAIN
 from homeassistant.components.vacuum import (
     DOMAIN as VACUUM_DOMAIN,
     SERVICE_RETURN_TO_BASE,
     SERVICE_START,
     STATE_CLEANING,
+    SUPPORT_RETURN_HOME,
+    SUPPORT_START,
 )
 from homeassistant.const import (
     ATTR_ENTITY_ID,
+    ATTR_SUPPORTED_FEATURES,
     CONF_TYPE,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
@@ -111,10 +113,7 @@ class Switch(HomeAccessory):
 
     def is_activate(self, state):
         """Check if entity is activate only."""
-        can_cancel = state.attributes.get(ATTR_CAN_CANCEL)
         if self._domain == "scene":
-            return True
-        if self._domain == "script" and not can_cancel:
             return True
         return False
 
@@ -153,16 +152,24 @@ class Switch(HomeAccessory):
             self.char_on.set_value(current_state)
 
 
-@TYPES.register("DockVacuum")
-class DockVacuum(Switch):
+@TYPES.register("Vacuum")
+class Vacuum(Switch):
     """Generate a Switch accessory."""
 
     def set_state(self, value):
         """Move switch state to value if call came from HomeKit."""
         _LOGGER.debug("%s: Set switch state to %s", self.entity_id, value)
-        params = {ATTR_ENTITY_ID: self.entity_id}
-        service = SERVICE_START if value else SERVICE_RETURN_TO_BASE
-        self.call_service(VACUUM_DOMAIN, service, params)
+        state = self.hass.states.get(self.entity_id)
+        features = state.attributes.get(ATTR_SUPPORTED_FEATURES, 0)
+
+        if value:
+            sup_start = features & SUPPORT_START
+            service = SERVICE_START if sup_start else SERVICE_TURN_ON
+        else:
+            sup_return_home = features & SUPPORT_RETURN_HOME
+            service = SERVICE_RETURN_TO_BASE if sup_return_home else SERVICE_TURN_OFF
+
+        self.call_service(VACUUM_DOMAIN, service, {ATTR_ENTITY_ID: self.entity_id})
 
     @callback
     def async_update_state(self, new_state):

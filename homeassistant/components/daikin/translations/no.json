@@ -2,17 +2,21 @@
     "config": {
         "abort": {
             "already_configured": "Enheten er allerede konfigurert",
-            "device_fail": "Uventet feil under oppretting av enheten.",
-            "device_timeout": "Tidsavbrudd for tilkobling til enheten."
+            "cannot_connect": "Tilkobling mislyktes"
+        },
+        "error": {
+            "cannot_connect": "Tilkobling mislyktes",
+            "invalid_auth": "Ugyldig godkjenning",
+            "unknown": "Uventet feil"
         },
         "step": {
             "user": {
                 "data": {
+                    "api_key": "API-n\u00f8kkel",
                     "host": "Vert",
-                    "key": "Godkjenningsn\u00f8kkel (brukes bare av BRP072C/Zena enheter)",
-                    "password": "Enhetspassord (brukes bare av SKYFi-enheter)"
+                    "password": "Passord"
                 },
-                "description": "Fyll inn IP-adressen til din Daikin AC.",
+                "description": "Skriv inn IP adresse av Daikin AC.\n\n Merk at API-n\u00f8kkel og Passord bare brukes av henholdsvis BRP072Cxx og SKYFi-enheter.",
                 "title": "Konfigurer Daikin AC"
             }
         }

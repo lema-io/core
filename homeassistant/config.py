@@ -20,6 +20,8 @@ from homeassistant.const import (
     ATTR_ASSUMED_STATE,
     ATTR_FRIENDLY_NAME,
     ATTR_HIDDEN,
+    CONF_ALLOWLIST_EXTERNAL_DIRS,
+    CONF_ALLOWLIST_EXTERNAL_URLS,
     CONF_AUTH_MFA_MODULES,
     CONF_AUTH_PROVIDERS,
     CONF_CUSTOMIZE,
@@ -30,7 +32,9 @@ from homeassistant.const import (
     CONF_ID,
     CONF_INTERNAL_URL,
     CONF_LATITUDE,
+    CONF_LEGACY_TEMPLATES,
     CONF_LONGITUDE,
+    CONF_MEDIA_DIRS,
     CONF_NAME,
     CONF_PACKAGES,
     CONF_TEMPERATURE_UNIT,
@@ -38,7 +42,7 @@ from homeassistant.const import (
     CONF_TYPE,
     CONF_UNIT_SYSTEM,
     CONF_UNIT_SYSTEM_IMPERIAL,
-    CONF_WHITELIST_EXTERNAL_DIRS,
+    LEGACY_CONF_WHITELIST_EXTERNAL_DIRS,
     TEMP_CELSIUS,
     __version__,
 )
@@ -182,9 +186,13 @@ CORE_CONFIG_SCHEMA = CUSTOMIZE_CONFIG_SCHEMA.extend(
         CONF_TIME_ZONE: cv.time_zone,
         vol.Optional(CONF_INTERNAL_URL): cv.url,
         vol.Optional(CONF_EXTERNAL_URL): cv.url,
-        vol.Optional(CONF_WHITELIST_EXTERNAL_DIRS): vol.All(
+        vol.Optional(CONF_ALLOWLIST_EXTERNAL_DIRS): vol.All(
             cv.ensure_list, [vol.IsDir()]  # pylint: disable=no-value-for-parameter
         ),
+        vol.Optional(LEGACY_CONF_WHITELIST_EXTERNAL_DIRS): vol.All(
+            cv.ensure_list, [vol.IsDir()]  # pylint: disable=no-value-for-parameter
+        ),
+        vol.Optional(CONF_ALLOWLIST_EXTERNAL_URLS): vol.All(cv.ensure_list, [cv.url]),
         vol.Optional(CONF_PACKAGES, default={}): PACKAGES_CONFIG_SCHEMA,
         vol.Optional(CONF_AUTH_PROVIDERS): vol.All(
             cv.ensure_list,
@@ -215,6 +223,9 @@ CORE_CONFIG_SCHEMA = CUSTOMIZE_CONFIG_SCHEMA.extend(
             ],
             _no_duplicate_auth_mfa_module,
         ),
+        # pylint: disable=no-value-for-parameter
+        vol.Optional(CONF_MEDIA_DIRS): cv.schema_with_slug_keys(vol.IsDir()),
+        vol.Optional(CONF_LEGACY_TEMPLATES): cv.boolean,
     }
 )
 
@@ -401,17 +412,19 @@ def async_log_exception(
     """
     if hass is not None:
         async_notify_setup_error(hass, domain, link)
-    _LOGGER.error(_format_config_error(ex, domain, config, link))
+    message, is_friendly = _format_config_error(ex, domain, config, link)
+    _LOGGER.error(message, exc_info=not is_friendly and ex)
 
 
 @callback
 def _format_config_error(
     ex: Exception, domain: str, config: Dict, link: Optional[str] = None
-) -> str:
+) -> Tuple[str, bool]:
     """Generate log exception for configuration validation.
 
     This method must be run in the event loop.
     """
+    is_friendly = False
     message = f"Invalid config for [{domain}]: "
     if isinstance(ex, vol.Invalid):
         if "extra keys not allowed" in ex.error_message:
@@ -422,8 +435,9 @@ def _format_config_error(
             )
         else:
             message += f"{humanize_error(config, ex)}."
+        is_friendly = True
     else:
-        message += str(ex)
+        message += str(ex) or repr(ex)
 
     try:
         domain_config = config.get(domain, config)
@@ -438,7 +452,7 @@ def _format_config_error(
     if domain != CONF_CORE and link:
         message += f"Please check the docs at {link}"
 
-    return message
+    return message, is_friendly
 
 
 async def async_process_ha_core_config(hass: HomeAssistant, config: Dict) -> None:
@@ -490,6 +504,8 @@ async def async_process_ha_core_config(hass: HomeAssistant, config: Dict) -> Non
         (CONF_ELEVATION, "elevation"),
         (CONF_INTERNAL_URL, "internal_url"),
         (CONF_EXTERNAL_URL, "external_url"),
+        (CONF_MEDIA_DIRS, "media_dirs"),
+        (CONF_LEGACY_TEMPLATES, "legacy_templates"),
     ):
         if key in config:
             setattr(hac, attr, config[key])
@@ -497,10 +513,34 @@ async def async_process_ha_core_config(hass: HomeAssistant, config: Dict) -> Non
     if CONF_TIME_ZONE in config:
         hac.set_time_zone(config[CONF_TIME_ZONE])
 
+    if CONF_MEDIA_DIRS not in config:
+        if is_docker_env():
+            hac.media_dirs = {"local": "/media"}
+        else:
+            hac.media_dirs = {"local": hass.config.path("media")}
+
     # Init whitelist external dir
-    hac.whitelist_external_dirs = {hass.config.path("www")}
-    if CONF_WHITELIST_EXTERNAL_DIRS in config:
-        hac.whitelist_external_dirs.update(set(config[CONF_WHITELIST_EXTERNAL_DIRS]))
+    hac.allowlist_external_dirs = {hass.config.path("www"), *hac.media_dirs.values()}
+    if CONF_ALLOWLIST_EXTERNAL_DIRS in config:
+        hac.allowlist_external_dirs.update(set(config[CONF_ALLOWLIST_EXTERNAL_DIRS]))
+
+    elif LEGACY_CONF_WHITELIST_EXTERNAL_DIRS in config:
+        _LOGGER.warning(
+            "Key %s has been replaced with %s. Please update your config",
+            LEGACY_CONF_WHITELIST_EXTERNAL_DIRS,
+            CONF_ALLOWLIST_EXTERNAL_DIRS,
+        )
+        hac.allowlist_external_dirs.update(
+            set(config[LEGACY_CONF_WHITELIST_EXTERNAL_DIRS])
+        )
+
+    # Init whitelist external URL list – make sure to add / to every URL that doesn't
+    # already have it so that we can properly test "path ownership"
+    if CONF_ALLOWLIST_EXTERNAL_URLS in config:
+        hac.allowlist_external_urls.update(
+            url if url.endswith("/") else f"{url}/"
+            for url in config[CONF_ALLOWLIST_EXTERNAL_URLS]
+        )
 
     # Customize
     cust_exact = dict(config[CONF_CUSTOMIZE])
@@ -559,6 +599,9 @@ def _log_pkg_error(package: str, component: str, config: Dict, message: str) -> 
 
 def _identify_config_schema(module: ModuleType) -> Optional[str]:
     """Extract the schema and identify list or dict based."""
+    if not isinstance(module.CONFIG_SCHEMA, vol.Schema):  # type: ignore
+        return None
+
     schema = module.CONFIG_SCHEMA.schema  # type: ignore
 
     if isinstance(schema, vol.All):
@@ -710,8 +753,14 @@ async def async_process_component_config(
     config_validator = None
     try:
         config_validator = integration.get_platform("config")
-    except ImportError:
-        pass
+    except ImportError as err:
+        # Filter out import error of the config platform.
+        # If the config platform contains bad imports, make sure
+        # that still fails.
+        if err.name != f"{integration.pkg_path}.config":
+            _LOGGER.error("Error importing config platform %s: %s", domain, err)
+            return None
+
     if config_validator is not None and hasattr(
         config_validator, "async_validate_config"
     ):
@@ -782,9 +831,7 @@ async def async_process_component_config(
         # Validate platform specific schema
         if hasattr(platform, "PLATFORM_SCHEMA"):
             try:
-                p_validated = platform.PLATFORM_SCHEMA(  # type: ignore
-                    p_config
-                )
+                p_validated = platform.PLATFORM_SCHEMA(p_config)  # type: ignore
             except vol.Invalid as ex:
                 async_log_exception(
                     ex,
@@ -858,7 +905,7 @@ def async_notify_setup_error(
         part = f"[{name}]({link})" if link else name
         message += f" - {part}\n"
 
-    message += "\nPlease check your config."
+    message += "\nPlease check your config and [logs](/config/logs)."
 
     persistent_notification.async_create(
         hass, message, "Invalid config", "invalid_config"

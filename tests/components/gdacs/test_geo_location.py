@@ -1,5 +1,6 @@
 """The tests for the GDACS Feed integration."""
 import datetime
+from unittest.mock import patch
 
 from homeassistant.components import gdacs
 from homeassistant.components.gdacs import DEFAULT_SCAN_INTERVAL, DOMAIN, FEED
@@ -33,14 +34,13 @@ from homeassistant.setup import async_setup_component
 import homeassistant.util.dt as dt_util
 from homeassistant.util.unit_system import IMPERIAL_SYSTEM
 
-from tests.async_mock import patch
 from tests.common import async_fire_time_changed
 from tests.components.gdacs import _generate_mock_feed_entry
 
 CONFIG = {gdacs.DOMAIN: {CONF_RADIUS: 200}}
 
 
-async def test_setup(hass):
+async def test_setup(hass, legacy_patchable_time):
     """Test the general setup of the integration."""
     # Set up some mock feed entries for this test.
     mock_entry_1 = _generate_mock_feed_entry(
@@ -91,6 +91,7 @@ async def test_setup(hass):
     ) as mock_feed_update:
         mock_feed_update.return_value = "OK", [mock_entry_1, mock_entry_2, mock_entry_3]
         assert await async_setup_component(hass, gdacs.DOMAIN, CONFIG)
+        await hass.async_block_till_done()
         # Artificially trigger update and collect events.
         hass.bus.async_fire(EVENT_HOMEASSISTANT_START)
         await hass.async_block_till_done()
@@ -190,7 +191,7 @@ async def test_setup(hass):
         assert len(entity_registry.entities) == 1
 
 
-async def test_setup_imperial(hass):
+async def test_setup_imperial(hass, legacy_patchable_time):
     """Test the setup of the integration using imperial unit system."""
     hass.config.units = IMPERIAL_SYSTEM
     # Set up some mock feed entries for this test.
@@ -213,6 +214,7 @@ async def test_setup_imperial(hass):
     ):
         mock_feed_update.return_value = "OK", [mock_entry_1]
         assert await async_setup_component(hass, gdacs.DOMAIN, CONFIG)
+        await hass.async_block_till_done()
         # Artificially trigger update and collect events.
         hass.bus.async_fire(EVENT_HOMEASSISTANT_START)
         await hass.async_block_till_done()

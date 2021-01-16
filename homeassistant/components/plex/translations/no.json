@@ -3,11 +3,10 @@
         "abort": {
             "all_configured": "Alle knyttet servere som allerede er konfigurert",
             "already_configured": "Denne Plex-serveren er allerede konfigurert",
-            "already_in_progress": "Plex blir konfigurert",
-            "invalid_import": "Den importerte konfigurasjonen er ugyldig",
-            "non-interactive": "Ikke-interaktiv import",
+            "already_in_progress": "Konfigurasjonsflyten p\u00e5g\u00e5r allerede",
+            "reauth_successful": "Godkjenning p\u00e5 nytt var vellykket",
             "token_request_timeout": "Tidsavbrudd ved innhenting av token",
-            "unknown": "Mislyktes av ukjent \u00e5rsak"
+            "unknown": "Uventet feil"
         },
         "error": {
             "faulty_credentials": "Autorisasjonen mislyktes, bekreft token",
@@ -16,12 +15,13 @@
             "not_found": "Plex-server ikke funnet",
             "ssl_error": "Problem med SSL-sertifikat"
         },
+        "flow_title": "",
         "step": {
             "manual_setup": {
                 "data": {
-                    "host": "Host (valgfritt hvis token f\u00f8lger med)",
+                    "host": "Vert",
                     "port": "Port",
-                    "ssl": "Bruk SSL",
+                    "ssl": "Bruker et SSL-sertifikat",
                     "token": "Token (valgfritt)",
                     "verify_ssl": "Verifisere SSL-sertifikat"
                 },
@@ -34,19 +34,15 @@
                 "description": "Flere servere tilgjengelig, velg en:",
                 "title": "Velg Plex-server"
             },
-            "start_website_auth": {
-                "description": "Fortsett \u00e5 godkjenne p\u00e5 plex.tv",
-                "title": "Koble til Plex-server"
-            },
             "user": {
                 "description": "Fortsett til [plex.tv] (https://plex.tv) for \u00e5 koble en Plex-server.",
-                "title": "Plex Media Server"
+                "title": ""
             },
             "user_advanced": {
                 "data": {
                     "setup_method": "Oppsettmetode"
                 },
-                "title": "Plex Media Server"
+                "title": ""
             }
         }
     },

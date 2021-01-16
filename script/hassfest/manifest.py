@@ -33,16 +33,52 @@ def documentation_url(value: str) -> str:
     return value
 
 
+def verify_lowercase(value: str):
+    """Verify a value is lowercase."""
+    if value.lower() != value:
+        raise vol.Invalid("Value needs to be lowercase")
+
+    return value
+
+
+def verify_uppercase(value: str):
+    """Verify a value is uppercase."""
+    if value.upper() != value:
+        raise vol.Invalid("Value needs to be uppercase")
+
+    return value
+
+
 MANIFEST_SCHEMA = vol.Schema(
     {
         vol.Required("domain"): str,
         vol.Required("name"): str,
         vol.Optional("config_flow"): bool,
-        vol.Optional("zeroconf"): [str],
+        vol.Optional("mqtt"): [str],
+        vol.Optional("zeroconf"): [
+            vol.Any(
+                str,
+                vol.Schema(
+                    {
+                        vol.Required("type"): str,
+                        vol.Optional("macaddress"): vol.All(str, verify_uppercase),
+                        vol.Optional("name"): vol.All(str, verify_lowercase),
+                    }
+                ),
+            )
+        ],
         vol.Optional("ssdp"): vol.Schema(
             vol.All([vol.All(vol.Schema({}, extra=vol.ALLOW_EXTRA), vol.Length(min=1))])
         ),
         vol.Optional("homekit"): vol.Schema({vol.Optional("models"): [str]}),
+        vol.Optional("dhcp"): [
+            vol.Schema(
+                {
+                    vol.Optional("macaddress"): vol.All(str, verify_uppercase),
+                    vol.Optional("hostname"): vol.All(str, verify_lowercase),
+                }
+            )
+        ],
         vol.Required("documentation"): vol.All(
             vol.Url(), documentation_url  # pylint: disable=no-value-for-parameter
         ),
@@ -54,6 +90,7 @@ MANIFEST_SCHEMA = vol.Schema(
         vol.Optional("dependencies"): [str],
         vol.Optional("after_dependencies"): [str],
         vol.Required("codeowners"): [str],
+        vol.Optional("disabled"): str,
     }
 )
 

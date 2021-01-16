@@ -1,16 +1,16 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Ten klucz aplikacji jest ju\u017c w u\u017cyciu."
+            "already_configured": "Us\u0142uga jest ju\u017c skonfigurowana"
         },
         "error": {
-            "invalid_key": "Nieprawid\u0142owy klucz API i/lub klucz aplikacji",
+            "invalid_key": "Nieprawid\u0142owy klucz API",
             "no_devices": "Nie znaleziono urz\u0105dze\u0144 na koncie"
         },
         "step": {
             "user": {
                 "data": {
-                    "api_key": "[%key_id:common::config_flow::data::api_key%]",
+                    "api_key": "Klucz API",
                     "app_key": "Klucz aplikacji"
                 },
                 "title": "Wprowad\u017a dane"

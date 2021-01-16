@@ -1,6 +1,7 @@
 """Test songpal media_player."""
 from datetime import timedelta
 import logging
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from songpal import (
     ConnectChange,
@@ -32,7 +33,6 @@ from . import (
     _patch_media_player_device,
 )
 
-from tests.async_mock import AsyncMock, MagicMock, call, patch
 from tests.common import MockConfigEntry, async_fire_time_changed
 
 
@@ -114,9 +114,7 @@ async def test_state(hass):
     assert attributes["supported_features"] == SUPPORT_SONGPAL
 
     device_registry = await dr.async_get_registry(hass)
-    device = device_registry.async_get_device(
-        identifiers={(songpal.DOMAIN, MAC)}, connections={}
-    )
+    device = device_registry.async_get_device(identifiers={(songpal.DOMAIN, MAC)})
     assert device.connections == {(dr.CONNECTION_NETWORK_MAC, MAC)}
     assert device.manufacturer == "Sony Corporation"
     assert device.name == FRIENDLY_NAME
@@ -156,9 +154,7 @@ async def test_services(hass):
     await _call(media_player.SERVICE_VOLUME_UP)
     await _call(media_player.SERVICE_VOLUME_DOWN)
     assert mocked_device.volume1.set_volume.call_count == 3
-    mocked_device.volume1.set_volume.assert_has_calls(
-        [call(60), call("+1"), call("-1")]
-    )
+    mocked_device.volume1.set_volume.assert_has_calls([call(60), call(51), call(49)])
 
     await _call(media_player.SERVICE_VOLUME_MUTE, is_volume_muted=True)
     mocked_device.volume1.set_mute.assert_called_once_with(True)
@@ -262,6 +258,6 @@ async def test_disconnected(hass, caplog):
         await notification_callbacks[ConnectChange](connect_change)
     warning_records = [x for x in caplog.records if x.levelno == logging.WARNING]
     assert len(warning_records) == 2
-    assert warning_records[0].message.endswith("Got disconnected, trying to reconnect.")
-    assert warning_records[1].message.endswith("Connection reestablished.")
+    assert warning_records[0].message.endswith("Got disconnected, trying to reconnect")
+    assert warning_records[1].message.endswith("Connection reestablished")
     assert not any(x.levelno == logging.ERROR for x in caplog.records)

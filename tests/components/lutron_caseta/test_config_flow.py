@@ -1,5 +1,6 @@
 """Test the Lutron Caseta config flow."""
-from asynctest import patch
+from unittest.mock import AsyncMock, patch
+
 from pylutron_caseta.smartbridge import Smartbridge
 
 from homeassistant import config_entries, data_entry_flow
@@ -50,8 +51,13 @@ async def test_bridge_import_flow(hass):
     }
 
     with patch(
-        "homeassistant.components.lutron_caseta.async_setup_entry", return_value=True,
-    ) as mock_setup_entry, patch.object(Smartbridge, "create_tls") as create_tls:
+        "homeassistant.components.lutron_caseta.async_setup_entry",
+        return_value=True,
+    ) as mock_setup_entry, patch(
+        "homeassistant.components.lutron_caseta.async_setup", return_value=True
+    ), patch.object(
+        Smartbridge, "create_tls"
+    ) as create_tls:
         create_tls.return_value = MockBridge(can_connect=True)
 
         result = await hass.config_entries.flow.async_init(
@@ -77,9 +83,7 @@ async def test_bridge_cannot_connect(hass):
         CONF_CA_CERTS: "",
     }
 
-    with patch(
-        "homeassistant.components.lutron_caseta.async_setup_entry", return_value=True,
-    ) as mock_setup_entry, patch.object(Smartbridge, "create_tls") as create_tls:
+    with patch.object(Smartbridge, "create_tls") as create_tls:
         create_tls.return_value = MockBridge(can_connect=False)
 
         result = await hass.config_entries.flow.async_init(
@@ -91,8 +95,41 @@ async def test_bridge_cannot_connect(hass):
     assert result["type"] == "form"
     assert result["step_id"] == STEP_IMPORT_FAILED
     assert result["errors"] == {"base": ERROR_CANNOT_CONNECT}
-    # validate setup_entry was not called
-    assert len(mock_setup_entry.mock_calls) == 0
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == data_entry_flow.RESULT_TYPE_ABORT
+    assert result["reason"] == CasetaConfigFlow.ABORT_REASON_CANNOT_CONNECT
+
+
+async def test_bridge_cannot_connect_unknown_error(hass):
+    """Test checking for connection and encountering an unknown error."""
+
+    entry_mock_data = {
+        CONF_HOST: "",
+        CONF_KEYFILE: "",
+        CONF_CERTFILE: "",
+        CONF_CA_CERTS: "",
+    }
+
+    with patch.object(Smartbridge, "create_tls") as create_tls:
+        mock_bridge = MockBridge()
+        mock_bridge.connect = AsyncMock(side_effect=Exception())
+        create_tls.return_value = mock_bridge
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_IMPORT},
+            data=entry_mock_data,
+        )
+
+    assert result["type"] == "form"
+    assert result["step_id"] == STEP_IMPORT_FAILED
+    assert result["errors"] == {"base": ERROR_CANNOT_CONNECT}
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == data_entry_flow.RESULT_TYPE_ABORT
+    assert result["reason"] == CasetaConfigFlow.ABORT_REASON_CANNOT_CONNECT
 
 
 async def test_duplicate_bridge_import(hass):
@@ -108,7 +145,8 @@ async def test_duplicate_bridge_import(hass):
     mock_entry.add_to_hass(hass)
 
     with patch(
-        "homeassistant.components.lutron_caseta.async_setup_entry", return_value=True,
+        "homeassistant.components.lutron_caseta.async_setup_entry",
+        return_value=True,
     ) as mock_setup_entry:
         # Mock entry added, try initializing flow with duplicate host
         result = await hass.config_entries.flow.async_init(

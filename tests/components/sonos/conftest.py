@@ -1,12 +1,13 @@
 """Configuration for Sonos tests."""
+from unittest.mock import Mock, patch as patch
+
 import pytest
 
 from homeassistant.components.media_player import DOMAIN as MP_DOMAIN
 from homeassistant.components.sonos import DOMAIN
 from homeassistant.const import CONF_HOSTS
 
-from tests.async_mock import Mock, patch as patch
-from tests.common import MockConfigEntry
+from tests.common import MockConfigEntry, load_fixture
 
 
 @pytest.fixture(name="config_entry")
@@ -23,6 +24,7 @@ def soco_fixture(music_library, speaker_info, dummy_soco_service):
     ):
         mock_soco = mock.return_value
         mock_soco.uid = "RINCON_test"
+        mock_soco.play_mode = "NORMAL"
         mock_soco.music_library = music_library
         mock_soco.get_speaker_info.return_value = speaker_info
         mock_soco.avTransport = dummy_soco_service
@@ -69,4 +71,27 @@ def music_library_fixture():
 @pytest.fixture(name="speaker_info")
 def speaker_info_fixture():
     """Create speaker_info fixture."""
-    return {"zone_name": "Zone A", "model_name": "Model Name"}
+    return {
+        "zone_name": "Zone A",
+        "model_name": "Model Name",
+        "software_version": "49.2-64250",
+        "mac_address": "00-11-22-33-44-55",
+    }
+
+
+@pytest.fixture(name="plex_empty_payload", scope="session")
+def plex_empty_payload_fixture():
+    """Load an empty payload and return it."""
+    return load_fixture("plex/empty_payload.xml")
+
+
+@pytest.fixture(name="plextv_account", scope="session")
+def plextv_account_fixture():
+    """Load account info from plex.tv and return it."""
+    return load_fixture("plex/plextv_account.xml")
+
+
+@pytest.fixture(name="plex_sonos_resources", scope="session")
+def plex_sonos_resources_fixture():
+    """Load Sonos resources payload and return it."""
+    return load_fixture("plex/sonos_resources.xml")

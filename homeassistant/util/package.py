@@ -1,5 +1,6 @@
 """Helpers to install PyPi packages."""
 import asyncio
+from importlib.metadata import PackageNotFoundError, version
 import logging
 import os
 from pathlib import Path
@@ -8,7 +9,6 @@ import sys
 from typing import Optional
 from urllib.parse import urlparse
 
-from importlib_metadata import PackageNotFoundError, version
 import pkg_resources
 
 _LOGGER = logging.getLogger(__name__)

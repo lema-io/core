@@ -2,6 +2,7 @@
 import json
 import unittest
 from unittest import mock
+from unittest.mock import patch
 
 from libpurecool.const import FanMode, FanSpeed, NightMode, Oscillation
 from libpurecool.dyson_pure_cool import DysonPureCool
@@ -27,7 +28,6 @@ from homeassistant.setup import async_setup_component
 
 from .common import load_mock_device
 
-from tests.async_mock import patch
 from tests.common import get_test_home_assistant
 
 
@@ -37,6 +37,10 @@ class MockDysonState(DysonPureCoolState):
     def __init__(self):
         """Create new Mock Dyson State."""
         pass
+
+    def __repr__(self):
+        """Mock repr because original one fails since constructor not called."""
+        return "<MockDysonState>"
 
 
 def _get_dyson_purecool_device():
@@ -136,8 +140,9 @@ class DysonSetupTest(unittest.TestCase):
     def setUp(self):  # pylint: disable=invalid-name
         """Set up things to be run when tests are started."""
         self.hass = get_test_home_assistant()
+        self.addCleanup(self.tear_down_cleanup)
 
-    def tearDown(self):  # pylint: disable=invalid-name
+    def tear_down_cleanup(self):
         """Stop everything that was started."""
         self.hass.stop()
 
@@ -173,8 +178,9 @@ class DysonTest(unittest.TestCase):
     def setUp(self):  # pylint: disable=invalid-name
         """Set up things to be run when tests are started."""
         self.hass = get_test_home_assistant()
+        self.addCleanup(self.tear_down_cleanup)
 
-    def tearDown(self):  # pylint: disable=invalid-name
+    def tear_down_cleanup(self):
         """Stop everything that was started."""
         self.hass.stop()
 

@@ -1,4 +1,6 @@
 """The tests for the Roku remote platform."""
+from unittest.mock import patch
+
 from homeassistant.components.remote import (
     ATTR_COMMAND,
     DOMAIN as REMOTE_DOMAIN,
@@ -7,7 +9,6 @@ from homeassistant.components.remote import (
 from homeassistant.const import ATTR_ENTITY_ID, SERVICE_TURN_OFF, SERVICE_TURN_ON
 from homeassistant.helpers.typing import HomeAssistantType
 
-from tests.async_mock import patch
 from tests.components.roku import UPNP_SERIAL, setup_integration
 from tests.test_util.aiohttp import AiohttpClientMocker
 
@@ -39,7 +40,7 @@ async def test_unique_id(
 async def test_main_services(
     hass: HomeAssistantType, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """Test the different services."""
+    """Test platform services."""
     await setup_integration(hass, aioclient_mock)
 
     with patch("homeassistant.components.roku.Roku.remote") as remote_mock:

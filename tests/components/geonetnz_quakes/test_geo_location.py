@@ -1,5 +1,6 @@
 """The tests for the GeoNet NZ Quakes Feed integration."""
 import datetime
+from unittest.mock import patch
 
 from homeassistant.components import geonetnz_quakes
 from homeassistant.components.geo_location import ATTR_SOURCE
@@ -29,7 +30,6 @@ from homeassistant.setup import async_setup_component
 import homeassistant.util.dt as dt_util
 from homeassistant.util.unit_system import IMPERIAL_SYSTEM
 
-from tests.async_mock import patch
 from tests.common import async_fire_time_changed
 from tests.components.geonetnz_quakes import _generate_mock_feed_entry
 
@@ -67,6 +67,7 @@ async def test_setup(hass):
     ) as mock_feed_update:
         mock_feed_update.return_value = "OK", [mock_entry_1, mock_entry_2, mock_entry_3]
         assert await async_setup_component(hass, geonetnz_quakes.DOMAIN, CONFIG)
+        await hass.async_block_till_done()
         # Artificially trigger update and collect events.
         hass.bus.async_fire(EVENT_HOMEASSISTANT_START)
         await hass.async_block_till_done()
@@ -172,6 +173,7 @@ async def test_setup_imperial(hass):
     ):
         mock_feed_update.return_value = "OK", [mock_entry_1]
         assert await async_setup_component(hass, geonetnz_quakes.DOMAIN, CONFIG)
+        await hass.async_block_till_done()
         # Artificially trigger update and collect events.
         hass.bus.async_fire(EVENT_HOMEASSISTANT_START)
         await hass.async_block_till_done()

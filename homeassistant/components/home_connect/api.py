@@ -7,7 +7,7 @@ import homeconnect
 from homeconnect.api import HomeConnectError
 
 from homeassistant import config_entries, core
-from homeassistant.const import DEVICE_CLASS_TIMESTAMP, TIME_SECONDS, UNIT_PERCENTAGE
+from homeassistant.const import DEVICE_CLASS_TIMESTAMP, PERCENTAGE, TIME_SECONDS
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.helpers.dispatcher import dispatcher_send
 
@@ -69,7 +69,7 @@ class ConfigEntryAuth(homeconnect.HomeConnectAPI):
             elif app.type == "Hob":
                 device = Hob(self.hass, app)
             else:
-                _LOGGER.warning("Appliance type %s not implemented.", app.type)
+                _LOGGER.warning("Appliance type %s not implemented", app.type)
                 continue
             devices.append({"device": device, "entities": device.get_entity_info()})
         self.devices = devices
@@ -93,15 +93,15 @@ class HomeConnectDevice:
         try:
             self.appliance.get_status()
         except (HomeConnectError, ValueError):
-            _LOGGER.debug("Unable to fetch appliance status. Probably offline.")
+            _LOGGER.debug("Unable to fetch appliance status. Probably offline")
         try:
             self.appliance.get_settings()
         except (HomeConnectError, ValueError):
-            _LOGGER.debug("Unable to fetch settings. Probably offline.")
+            _LOGGER.debug("Unable to fetch settings. Probably offline")
         try:
             program_active = self.appliance.get_programs_active()
         except (HomeConnectError, ValueError):
-            _LOGGER.debug("Unable to fetch active programs. Probably offline.")
+            _LOGGER.debug("Unable to fetch active programs. Probably offline")
             program_active = None
         if program_active and "key" in program_active:
             self.appliance.status[BSH_ACTIVE_PROGRAM] = {"value": program_active["key"]}
@@ -140,7 +140,7 @@ class DeviceWithPrograms(HomeConnectDevice):
         sensors = {
             "Remaining Program Time": (None, None, DEVICE_CLASS_TIMESTAMP, 1),
             "Duration": (TIME_SECONDS, "mdi:update", None, 1),
-            "Program Progress": (UNIT_PERCENTAGE, "mdi:progress-clock", None, 1),
+            "Program Progress": (PERCENTAGE, "mdi:progress-clock", None, 1),
         }
         return [
             {
@@ -165,6 +165,30 @@ class DeviceWithDoor(HomeConnectDevice):
             "device": self,
             "desc": "Door",
             "device_class": "door",
+        }
+
+
+class DeviceWithLight(HomeConnectDevice):
+    """Device that has lighting."""
+
+    def get_light_entity(self):
+        """Get a dictionary with info about the lighting."""
+        return {
+            "device": self,
+            "desc": "Light",
+            "ambient": None,
+        }
+
+
+class DeviceWithAmbientLight(HomeConnectDevice):
+    """Device that has ambient lighting."""
+
+    def get_ambientlight_entity(self):
+        """Get a dictionary with info about the ambient lighting."""
+        return {
+            "device": self,
+            "desc": "AmbientLight",
+            "ambient": True,
         }
 
 
@@ -202,7 +226,7 @@ class Dryer(DeviceWithDoor, DeviceWithPrograms):
         }
 
 
-class Dishwasher(DeviceWithDoor, DeviceWithPrograms):
+class Dishwasher(DeviceWithDoor, DeviceWithAmbientLight, DeviceWithPrograms):
     """Dishwasher class."""
 
     PROGRAMS = [
@@ -335,7 +359,7 @@ class CoffeeMaker(DeviceWithPrograms):
         return {"switch": program_switches, "sensor": program_sensors}
 
 
-class Hood(DeviceWithPrograms):
+class Hood(DeviceWithLight, DeviceWithAmbientLight, DeviceWithPrograms):
     """Hood class."""
 
     PROGRAMS = [
@@ -346,9 +370,15 @@ class Hood(DeviceWithPrograms):
 
     def get_entity_info(self):
         """Get a dictionary with infos about the associated entities."""
+        light_entity = self.get_light_entity()
+        ambientlight_entity = self.get_ambientlight_entity()
         program_sensors = self.get_program_sensors()
         program_switches = self.get_program_switches()
-        return {"switch": program_switches, "sensor": program_sensors}
+        return {
+            "switch": program_switches,
+            "sensor": program_sensors,
+            "light": [light_entity, ambientlight_entity],
+        }
 
 
 class FridgeFreezer(DeviceWithDoor):

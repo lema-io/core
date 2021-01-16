@@ -4,7 +4,8 @@
             "user": {
                 "data": {
                     "flow_impl": "Tarjoaja"
-                }
+                },
+                "title": "Todentamisen tarjoaja"
             }
         }
     }

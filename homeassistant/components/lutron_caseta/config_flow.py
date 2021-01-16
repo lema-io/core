@@ -83,9 +83,9 @@ class LutronCasetaFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             bridge = Smartbridge.create_tls(
                 hostname=self.data[CONF_HOST],
-                keyfile=self.data[CONF_KEYFILE],
-                certfile=self.data[CONF_CERTFILE],
-                ca_certs=self.data[CONF_CA_CERTS],
+                keyfile=self.hass.config.path(self.data[CONF_KEYFILE]),
+                certfile=self.hass.config.path(self.data[CONF_CERTFILE]),
+                ca_certs=self.hass.config.path(self.data[CONF_CA_CERTS]),
             )
 
             await bridge.connect()
@@ -94,11 +94,6 @@ class LutronCasetaFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
             await bridge.close()
             return True
-        except (KeyError, ValueError):
-            _LOGGER.error(
-                "Error while checking connectivity to bridge %s", self.data[CONF_HOST],
-            )
-            return False
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception(
                 "Unknown exception while checking connectivity to bridge %s",

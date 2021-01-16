@@ -5,19 +5,17 @@
             "not_songpal_device": "Ikke en Songpal-enhet"
         },
         "error": {
-            "connection": "Tilkoblingsfeil: vennligst sjekk endepunktet ditt"
+            "cannot_connect": "Tilkobling mislyktes"
         },
         "flow_title": "",
         "step": {
             "init": {
-                "description": "Vil du sette opp {name} ({host})?",
-                "title": ""
+                "description": "Vil du sette opp {name} ({host})?"
             },
             "user": {
                 "data": {
                     "endpoint": "Endepunkt"
-                },
-                "title": ""
+                }
             }
         }
     }

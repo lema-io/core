@@ -3,9 +3,10 @@
         "abort": {
             "already_setup": "Already configured. Only a single configuration possible.",
             "authorize_url_fail": "Unknown error generating an authorize url.",
-            "authorize_url_timeout": "Timeout generating authorize url.",
+            "authorize_url_timeout": "Timeout generating authorize URL.",
             "external_setup": "Point successfully configured from another flow.",
-            "no_flows": "The component is not configured. Please follow the documentation."
+            "no_flows": "The component is not configured. Please follow the documentation.",
+            "unknown_authorize_url_generation": "Unknown error generating an authorize url."
         },
         "create_entry": {
             "default": "Successfully authenticated"
@@ -16,7 +17,7 @@
         },
         "step": {
             "auth": {
-                "description": "Please follow the link below and <b>Accept</b> access to your Minut account, then come back and press <b>Submit</b> below.\n\n[Link]({authorization_url})",
+                "description": "Please follow the link below and **Accept** access to your Minut account, then come back and press **Submit** below.\n\n[Link]({authorization_url})",
                 "title": "Authenticate Point"
             },
             "user": {

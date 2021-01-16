@@ -1,16 +1,16 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Konto jest ju\u017c skonfigurowane."
+            "already_configured": "Konto jest ju\u017c skonfigurowane"
         },
         "error": {
-            "login": "B\u0142\u0105d logowania: sprawd\u017a swoj\u0105 nazw\u0119 u\u017cytkownika i has\u0142o"
+            "invalid_auth": "Niepoprawne uwierzytelnienie"
         },
         "step": {
             "user": {
                 "data": {
-                    "password": "[%key_id:common::config_flow::data::password%]",
-                    "username": "[%key_id:common::config_flow::data::username%]"
+                    "password": "Has\u0142o",
+                    "username": "Nazwa u\u017cytkownika"
                 },
                 "title": "Total Connect"
             }

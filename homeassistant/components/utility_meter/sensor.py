@@ -16,7 +16,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import (
-    async_track_state_change,
+    async_track_state_change_event,
     async_track_time_change,
 )
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -24,6 +24,7 @@ import homeassistant.util.dt as dt_util
 
 from .const import (
     ATTR_VALUE,
+    BIMONTHLY,
     CONF_METER,
     CONF_METER_NET_CONSUMPTION,
     CONF_METER_OFFSET,
@@ -35,6 +36,7 @@ from .const import (
     DATA_UTILITY,
     HOURLY,
     MONTHLY,
+    QUARTER_HOURLY,
     QUARTERLY,
     SERVICE_CALIBRATE_METER,
     SIGNAL_RESET_METER,
@@ -131,8 +133,10 @@ class UtilityMeterSensor(RestoreEntity):
         self._tariff_entity = tariff_entity
 
     @callback
-    def async_reading(self, entity, old_state, new_state):
+    def async_reading(self, event):
         """Handle the sensor state changes."""
+        old_state = event.data.get("old_state")
+        new_state = event.data.get("new_state")
         if (
             old_state is None
             or new_state is None
@@ -141,13 +145,7 @@ class UtilityMeterSensor(RestoreEntity):
         ):
             return
 
-        if (
-            self._unit_of_measurement is None
-            and new_state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) is not None
-        ):
-            self._unit_of_measurement = new_state.attributes.get(
-                ATTR_UNIT_OF_MEASUREMENT
-            )
+        self._unit_of_measurement = new_state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
 
         try:
             diff = Decimal(new_state.state) - Decimal(old_state.state)
@@ -166,11 +164,18 @@ class UtilityMeterSensor(RestoreEntity):
         self.async_write_ha_state()
 
     @callback
-    def async_tariff_change(self, entity, old_state, new_state):
+    def async_tariff_change(self, event):
         """Handle tariff changes."""
-        if self._tariff == new_state.state:
-            self._collecting = async_track_state_change(
-                self.hass, self._sensor_source_id, self.async_reading
+        new_state = event.data.get("new_state")
+        if new_state is None:
+            return
+
+        self._change_status(new_state.state)
+
+    def _change_status(self, tariff):
+        if self._tariff == tariff:
+            self._collecting = async_track_state_change_event(
+                self.hass, [self._sensor_source_id], self.async_reading
             )
         else:
             if self._collecting:
@@ -197,6 +202,12 @@ class UtilityMeterSensor(RestoreEntity):
         if (
             self._period == MONTHLY
             and now != date(now.year, now.month, 1) + self._period_offset
+        ):
+            return
+        if (
+            self._period == BIMONTHLY
+            and now
+            != date(now.year, (((now.month - 1) // 2) * 2 + 1), 1) + self._period_offset
         ):
             return
         if (
@@ -229,14 +240,23 @@ class UtilityMeterSensor(RestoreEntity):
         """Handle entity which will be added."""
         await super().async_added_to_hass()
 
-        if self._period == HOURLY:
+        if self._period == QUARTER_HOURLY:
+            for quarter in range(4):
+                async_track_time_change(
+                    self.hass,
+                    self._async_reset_meter,
+                    minute=(quarter * 15)
+                    + self._period_offset.seconds % (15 * 60) // 60,
+                    second=self._period_offset.seconds % 60,
+                )
+        elif self._period == HOURLY:
             async_track_time_change(
                 self.hass,
                 self._async_reset_meter,
                 minute=self._period_offset.seconds // 60,
                 second=self._period_offset.seconds % 60,
             )
-        elif self._period in [DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY]:
+        elif self._period in [DAILY, WEEKLY, MONTHLY, BIMONTHLY, QUARTERLY, YEARLY]:
             async_track_time_change(
                 self.hass,
                 self._async_reset_meter,
@@ -252,28 +272,31 @@ class UtilityMeterSensor(RestoreEntity):
             self._state = Decimal(state.state)
             self._unit_of_measurement = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
             self._last_period = state.attributes.get(ATTR_LAST_PERIOD)
-            self._last_reset = state.attributes.get(ATTR_LAST_RESET)
-            self.async_write_ha_state()
-            if state.attributes.get(ATTR_STATUS) == PAUSED:
-                # Fake cancellation function to init the meter paused
+            self._last_reset = dt_util.parse_datetime(
+                state.attributes.get(ATTR_LAST_RESET)
+            )
+            if state.attributes.get(ATTR_STATUS) == COLLECTING:
+                # Fake cancellation function to init the meter in similar state
                 self._collecting = lambda: None
 
         @callback
         def async_source_tracking(event):
             """Wait for source to be ready, then start meter."""
             if self._tariff_entity is not None:
-                _LOGGER.debug("Track %s", self._tariff_entity)
-                async_track_state_change(
-                    self.hass, self._tariff_entity, self.async_tariff_change
+                _LOGGER.debug(
+                    "<%s> tracks utility meter %s", self.name, self._tariff_entity
+                )
+                async_track_state_change_event(
+                    self.hass, [self._tariff_entity], self.async_tariff_change
                 )
 
                 tariff_entity_state = self.hass.states.get(self._tariff_entity)
-                if self._tariff != tariff_entity_state.state:
-                    return
+                self._change_status(tariff_entity_state.state)
+                return
 
-            _LOGGER.debug("tracking source: %s", self._sensor_source_id)
-            self._collecting = async_track_state_change(
-                self.hass, self._sensor_source_id, self.async_reading
+            _LOGGER.debug("<%s> collecting from %s", self.name, self._sensor_source_id)
+            self._collecting = async_track_state_change_event(
+                self.hass, [self._sensor_source_id], self.async_reading
             )
 
         self.hass.bus.async_listen_once(

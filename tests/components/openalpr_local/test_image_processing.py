@@ -1,10 +1,11 @@
 """The tests for the openalpr local platform."""
+from unittest.mock import MagicMock, PropertyMock, patch
+
 import homeassistant.components.image_processing as ip
 from homeassistant.const import ATTR_ENTITY_PICTURE
 from homeassistant.core import callback
 from homeassistant.setup import setup_component
 
-from tests.async_mock import MagicMock, PropertyMock, patch
 from tests.common import assert_setup_component, get_test_home_assistant, load_fixture
 from tests.components.image_processing import common
 
@@ -46,6 +47,7 @@ class TestOpenAlprLocalSetup:
 
         with assert_setup_component(1, ip.DOMAIN):
             setup_component(self.hass, ip.DOMAIN, config)
+            self.hass.block_till_done()
 
         assert self.hass.states.get("image_processing.openalpr_demo_camera")
 
@@ -62,6 +64,7 @@ class TestOpenAlprLocalSetup:
 
         with assert_setup_component(1, ip.DOMAIN):
             setup_component(self.hass, ip.DOMAIN, config)
+            self.hass.block_till_done()
 
         assert self.hass.states.get("image_processing.test_local")
 
@@ -77,6 +80,7 @@ class TestOpenAlprLocalSetup:
 
         with assert_setup_component(0, ip.DOMAIN):
             setup_component(self.hass, ip.DOMAIN, config)
+            self.hass.block_till_done()
 
 
 class TestOpenAlprLocal:
@@ -101,9 +105,10 @@ class TestOpenAlprLocal:
             new_callable=PropertyMock(return_value=False),
         ):
             setup_component(self.hass, ip.DOMAIN, config)
+            self.hass.block_till_done()
 
         state = self.hass.states.get("camera.demo_camera")
-        self.url = f"{self.hass.config.api.base_url}{state.attributes.get(ATTR_ENTITY_PICTURE)}"
+        self.url = f"{self.hass.config.internal_url}{state.attributes.get(ATTR_ENTITY_PICTURE)}"
 
         self.alpr_events = []
 

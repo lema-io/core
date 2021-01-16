@@ -40,6 +40,7 @@ from homeassistant.core import callback
 
 from .accessories import TYPES, HomeAccessory
 from .const import (
+    ATTR_KEY_NAME,
     CHAR_ACTIVE,
     CHAR_ACTIVE_IDENTIFIER,
     CHAR_CONFIGURED_NAME,
@@ -56,10 +57,24 @@ from .const import (
     CHAR_VOLUME_CONTROL_TYPE,
     CHAR_VOLUME_SELECTOR,
     CONF_FEATURE_LIST,
+    EVENT_HOMEKIT_TV_REMOTE_KEY_PRESSED,
     FEATURE_ON_OFF,
     FEATURE_PLAY_PAUSE,
     FEATURE_PLAY_STOP,
     FEATURE_TOGGLE_MUTE,
+    KEY_ARROW_DOWN,
+    KEY_ARROW_LEFT,
+    KEY_ARROW_RIGHT,
+    KEY_ARROW_UP,
+    KEY_BACK,
+    KEY_EXIT,
+    KEY_FAST_FORWARD,
+    KEY_INFORMATION,
+    KEY_NEXT_TRACK,
+    KEY_PLAY_PAUSE,
+    KEY_PREVIOUS_TRACK,
+    KEY_REWIND,
+    KEY_SELECT,
     SERV_INPUT_SOURCE,
     SERV_SWITCH,
     SERV_TELEVISION,
@@ -70,19 +85,19 @@ from .util import get_media_player_features
 _LOGGER = logging.getLogger(__name__)
 
 MEDIA_PLAYER_KEYS = {
-    # 0: "Rewind",
-    # 1: "FastForward",
-    # 2: "NextTrack",
-    # 3: "PreviousTrack",
-    # 4: "ArrowUp",
-    # 5: "ArrowDown",
-    # 6: "ArrowLeft",
-    # 7: "ArrowRight",
-    # 8: "Select",
-    # 9: "Back",
-    # 10: "Exit",
-    11: SERVICE_MEDIA_PLAY_PAUSE,
-    # 15: "Information",
+    0: KEY_REWIND,
+    1: KEY_FAST_FORWARD,
+    2: KEY_NEXT_TRACK,
+    3: KEY_PREVIOUS_TRACK,
+    4: KEY_ARROW_UP,
+    5: KEY_ARROW_DOWN,
+    6: KEY_ARROW_LEFT,
+    7: KEY_ARROW_RIGHT,
+    8: KEY_SELECT,
+    9: KEY_BACK,
+    10: KEY_EXIT,
+    11: KEY_PLAY_PAUSE,
+    15: KEY_INFORMATION,
 }
 
 # Names may not contain special characters
@@ -216,7 +231,9 @@ class MediaPlayer(HomeAccessory):
         if self.chars[FEATURE_PLAY_STOP]:
             hk_state = current_state == STATE_PLAYING
             _LOGGER.debug(
-                '%s: Set current state for "play_stop" to %s', self.entity_id, hk_state,
+                '%s: Set current state for "play_stop" to %s',
+                self.entity_id,
+                hk_state,
             )
             if self.chars[FEATURE_PLAY_STOP].value != hk_state:
                 self.chars[FEATURE_PLAY_STOP].set_value(hk_state)
@@ -245,13 +262,11 @@ class TelevisionMediaPlayer(HomeAccessory):
 
         self.sources = []
 
-        # Add additional characteristics if volume or input selection supported
-        self.chars_tv = []
+        self.chars_tv = [CHAR_REMOTE_KEY]
         self.chars_speaker = []
         features = state.attributes.get(ATTR_SUPPORTED_FEATURES, 0)
 
-        if features & (SUPPORT_PLAY | SUPPORT_PAUSE):
-            self.chars_tv.append(CHAR_REMOTE_KEY)
+        self._supports_play_pause = features & (SUPPORT_PLAY | SUPPORT_PAUSE)
         if features & SUPPORT_VOLUME_MUTE or features & SUPPORT_VOLUME_STEP:
             self.chars_speaker.extend(
                 (CHAR_NAME, CHAR_ACTIVE, CHAR_VOLUME_CONTROL_TYPE, CHAR_VOLUME_SELECTOR)
@@ -271,10 +286,9 @@ class TelevisionMediaPlayer(HomeAccessory):
             CHAR_ACTIVE, setter_callback=self.set_on_off
         )
 
-        if CHAR_REMOTE_KEY in self.chars_tv:
-            self.char_remote_key = serv_tv.configure_char(
-                CHAR_REMOTE_KEY, setter_callback=self.set_remote_key
-            )
+        self.char_remote_key = serv_tv.configure_char(
+            CHAR_REMOTE_KEY, setter_callback=self.set_remote_key
+        )
 
         if CHAR_VOLUME_SELECTOR in self.chars_speaker:
             serv_speaker = self.add_preload_service(
@@ -321,7 +335,7 @@ class TelevisionMediaPlayer(HomeAccessory):
                 input_type = 3 if "hdmi" in source.lower() else 0
                 serv_input.configure_char(CHAR_INPUT_SOURCE_TYPE, value=input_type)
                 serv_input.configure_char(CHAR_CURRENT_VISIBILITY_STATE, value=False)
-                _LOGGER.debug("%s: Added source %s.", self.entity_id, source)
+                _LOGGER.debug("%s: Added source %s", self.entity_id, source)
 
         self.async_update_state(state)
 
@@ -363,19 +377,28 @@ class TelevisionMediaPlayer(HomeAccessory):
     def set_remote_key(self, value):
         """Send remote key value if call came from HomeKit."""
         _LOGGER.debug("%s: Set remote key to %s", self.entity_id, value)
-        service = MEDIA_PLAYER_KEYS.get(value)
-        if service:
-            # Handle Play Pause
-            if service == SERVICE_MEDIA_PLAY_PAUSE:
-                state = self.hass.states.get(self.entity_id).state
-                if state in (STATE_PLAYING, STATE_PAUSED):
-                    service = (
-                        SERVICE_MEDIA_PLAY
-                        if state == STATE_PAUSED
-                        else SERVICE_MEDIA_PAUSE
-                    )
+        key_name = MEDIA_PLAYER_KEYS.get(value)
+        if key_name is None:
+            _LOGGER.warning("%s: Unhandled key press for %s", self.entity_id, value)
+            return
+
+        if key_name == KEY_PLAY_PAUSE and self._supports_play_pause:
+            # Handle Play Pause by directly updating the media player entity.
+            state = self.hass.states.get(self.entity_id).state
+            if state in (STATE_PLAYING, STATE_PAUSED):
+                service = (
+                    SERVICE_MEDIA_PLAY if state == STATE_PAUSED else SERVICE_MEDIA_PAUSE
+                )
+            else:
+                service = SERVICE_MEDIA_PLAY_PAUSE
             params = {ATTR_ENTITY_ID: self.entity_id}
             self.call_service(DOMAIN, service, params)
+        else:
+            # Unhandled keys can be handled by listening to the event bus
+            self.hass.bus.fire(
+                EVENT_HOMEKIT_TV_REMOTE_KEY_PRESSED,
+                {ATTR_KEY_NAME: key_name, ATTR_ENTITY_ID: self.entity_id},
+            )
 
     @callback
     def async_update_state(self, new_state):
@@ -394,7 +417,9 @@ class TelevisionMediaPlayer(HomeAccessory):
         if CHAR_VOLUME_SELECTOR in self.chars_speaker:
             current_mute_state = bool(new_state.attributes.get(ATTR_MEDIA_VOLUME_MUTED))
             _LOGGER.debug(
-                "%s: Set current mute state to %s", self.entity_id, current_mute_state,
+                "%s: Set current mute state to %s",
+                self.entity_id,
+                current_mute_state,
             )
             if self.char_mute.value != current_mute_state:
                 self.char_mute.set_value(current_mute_state)
@@ -407,9 +432,10 @@ class TelevisionMediaPlayer(HomeAccessory):
                 index = self.sources.index(source_name)
                 if self.char_input_source.value != index:
                     self.char_input_source.set_value(index)
-            else:
+            elif hk_state:
                 _LOGGER.warning(
-                    "%s: Sources out of sync. Restart Home Assistant", self.entity_id,
+                    "%s: Sources out of sync. Restart Home Assistant",
+                    self.entity_id,
                 )
                 if self.char_input_source.value != 0:
                     self.char_input_source.set_value(0)

@@ -1,17 +1,17 @@
 {
     "config": {
         "abort": {
-            "already_configured": "[%key_id:common::config_flow::abort::already_configured_device%]",
-            "already_in_progress": "Konfiguracja urz\u0105dzenia jest ju\u017c w toku.",
+            "already_configured": "Urz\u0105dzenie jest ju\u017c skonfigurowane",
+            "already_in_progress": "Konfiguracja jest ju\u017c w toku",
             "not_konn_panel": "Nie rozpoznano urz\u0105dzenia Konnected.io",
-            "unknown": "[%key_id:common::config_flow::error::unknown%]"
+            "unknown": "Nieoczekiwany b\u0142\u0105d"
         },
         "error": {
-            "cannot_connect": "Nie mo\u017cna po\u0142\u0105czy\u0107 si\u0119 z panelem Konnected na {host}:{port}"
+            "cannot_connect": "Nie mo\u017cna nawi\u0105za\u0107 po\u0142\u0105czenia"
         },
         "step": {
             "confirm": {
-                "description": "Model: {model} \nHost: {host} \nPort: {port} \n\nMo\u017cesz skonfigurowa\u0107 IO i zachowanie  panelu w ustawieniach Konnected Alarm Panel.",
+                "description": "Model: {model} \nIdentyfikator: {id}\nHost: {host} \nPort: {port} \n\nMo\u017cesz skonfigurowa\u0107 IO i zachowanie panelu w ustawieniach Konnected Alarm Panel.",
                 "title": "Urz\u0105dzenie Konnected gotowe"
             },
             "import_confirm": {
@@ -20,11 +20,10 @@
             },
             "user": {
                 "data": {
-                    "host": "Adres IP urz\u0105dzenia Konnected",
-                    "port": "[%key_id:common::config_flow::data::port%] urz\u0105dzenia Konnected"
+                    "host": "Adres IP",
+                    "port": "Port"
                 },
-                "description": "Wprowad\u017a informacje o ho\u015bcie panelu Konnected.",
-                "title": "Wykryj urz\u0105dzenie Konnected"
+                "description": "Wprowad\u017a informacje o ho\u015bcie panelu Konnected."
             }
         }
     },
@@ -90,7 +89,8 @@
                 "data": {
                     "api_host": "Zast\u0119powanie adresu URL hosta API (opcjonalnie)",
                     "blink": "Miganie diody LED panelu podczas wysy\u0142ania zmiany stanu",
-                    "override_api_host": "Zast\u0105p domy\u015blny adres URL API Home Assistant'a"
+                    "discovery": "Odpowiadaj na \u017c\u0105dania wykrywania w Twojej sieci",
+                    "override_api_host": "Zast\u0105p domy\u015blny adres URL API Home Assistanta"
                 },
                 "description": "Wybierz po\u017c\u0105dane zachowanie dla swojego panelu",
                 "title": "R\u00f3\u017cne opcje"
@@ -104,7 +104,7 @@
                     "pause": "Przerwa mi\u0119dzy impulsami (ms) (opcjonalnie)",
                     "repeat": "Ilo\u015b\u0107 powt\u00f3rze\u0144 (-1=niesko\u0144czenie) (opcjonalnie)"
                 },
-                "description": "Wybierz opcje wyj\u015bcia dla {zone}",
+                "description": "Opcje {zone}: stan {state}",
                 "title": "Konfiguracja prze\u0142\u0105czalne wyj\u015bcie"
             }
         }

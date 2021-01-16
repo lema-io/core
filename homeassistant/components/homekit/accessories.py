@@ -8,8 +8,12 @@ from pyhap.accessory import Accessory, Bridge
 from pyhap.accessory_driver import AccessoryDriver
 from pyhap.const import CATEGORY_OTHER
 
-from homeassistant.components import cover, vacuum
-from homeassistant.components.cover import DEVICE_CLASS_GARAGE, DEVICE_CLASS_GATE
+from homeassistant.components import cover
+from homeassistant.components.cover import (
+    DEVICE_CLASS_GARAGE,
+    DEVICE_CLASS_GATE,
+    DEVICE_CLASS_WINDOW,
+)
 from homeassistant.components.media_player import DEVICE_CLASS_TV
 from homeassistant.const import (
     ATTR_BATTERY_CHARGING,
@@ -24,15 +28,17 @@ from homeassistant.const import (
     DEVICE_CLASS_HUMIDITY,
     DEVICE_CLASS_ILLUMINANCE,
     DEVICE_CLASS_TEMPERATURE,
+    LIGHT_LUX,
+    PERCENTAGE,
     STATE_ON,
+    STATE_UNAVAILABLE,
     TEMP_CELSIUS,
     TEMP_FAHRENHEIT,
-    UNIT_PERCENTAGE,
     __version__,
 )
-from homeassistant.core import callback as ha_callback, split_entity_id
+from homeassistant.core import Context, callback as ha_callback, split_entity_id
 from homeassistant.helpers.event import (
-    async_track_state_change,
+    async_track_state_change_event,
     track_point_in_utc_time,
 )
 from homeassistant.util import dt as dt_util
@@ -75,6 +81,7 @@ from .const import (
 from .util import (
     convert_to_float,
     dismiss_setup_message,
+    format_sw_version,
     show_setup_message,
     validate_media_player_features,
 )
@@ -127,7 +134,7 @@ def get_accessory(hass, driver, state, aid, config):
     if not aid:
         _LOGGER.warning(
             'The entity "%s" is not supported, since it '
-            "generates an invalid aid, please change it.",
+            "generates an invalid aid, please change it",
             state.entity_id,
         )
         return None
@@ -152,6 +159,11 @@ def get_accessory(hass, driver, state, aid, config):
             cover.SUPPORT_OPEN | cover.SUPPORT_CLOSE
         ):
             a_type = "GarageDoorOpener"
+        elif (
+            device_class == DEVICE_CLASS_WINDOW
+            and features & cover.SUPPORT_SET_POSITION
+        ):
+            a_type = "Window"
         elif features & cover.SUPPORT_SET_POSITION:
             a_type = "WindowCovering"
         elif features & (cover.SUPPORT_OPEN | cover.SUPPORT_CLOSE):
@@ -159,6 +171,9 @@ def get_accessory(hass, driver, state, aid, config):
 
     elif state.domain == "fan":
         a_type = "Fan"
+
+    elif state.domain == "humidifier":
+        a_type = "HumidifierDehumidifier"
 
     elif state.domain == "light":
         a_type = "Light"
@@ -184,7 +199,7 @@ def get_accessory(hass, driver, state, aid, config):
             TEMP_FAHRENHEIT,
         ):
             a_type = "TemperatureSensor"
-        elif device_class == DEVICE_CLASS_HUMIDITY and unit == UNIT_PERCENTAGE:
+        elif device_class == DEVICE_CLASS_HUMIDITY and unit == PERCENTAGE:
             a_type = "HumiditySensor"
         elif device_class == DEVICE_CLASS_PM25 or DEVICE_CLASS_PM25 in state.entity_id:
             a_type = "AirQualitySensor"
@@ -192,7 +207,7 @@ def get_accessory(hass, driver, state, aid, config):
             a_type = "CarbonMonoxideSensor"
         elif device_class == DEVICE_CLASS_CO2 or DEVICE_CLASS_CO2 in state.entity_id:
             a_type = "CarbonDioxideSensor"
-        elif device_class == DEVICE_CLASS_ILLUMINANCE or unit in ("lm", "lx"):
+        elif device_class == DEVICE_CLASS_ILLUMINANCE or unit in ("lm", LIGHT_LUX):
             a_type = "LightSensor"
 
     elif state.domain == "switch":
@@ -200,11 +215,7 @@ def get_accessory(hass, driver, state, aid, config):
         a_type = SWITCH_TYPES[switch_type]
 
     elif state.domain == "vacuum":
-        features = state.attributes.get(ATTR_SUPPORTED_FEATURES, 0)
-        if features & (vacuum.SUPPORT_START | vacuum.SUPPORT_RETURN_HOME):
-            a_type = "DockVacuum"
-        else:
-            a_type = "Switch"
+        a_type = "Vacuum"
 
     elif state.domain in ("automation", "input_boolean", "remote", "scene", "script"):
         a_type = "Switch"
@@ -253,7 +264,7 @@ class HomeAccessory(Accessory):
         else:
             model = domain.title()
         if ATTR_SOFTWARE_VERSION in self.config:
-            sw_version = self.config[ATTR_SOFTWARE_VERSION]
+            sw_version = format_sw_version(self.config[ATTR_SOFTWARE_VERSION])
         else:
             sw_version = __version__
 
@@ -268,6 +279,7 @@ class HomeAccessory(Accessory):
         self.entity_id = entity_id
         self.hass = hass
         self.debounce = {}
+        self._subscriptions = []
         self._char_battery = None
         self._char_charging = None
         self._char_low_battery = None
@@ -321,6 +333,12 @@ class HomeAccessory(Accessory):
             CHAR_STATUS_LOW_BATTERY, value=0
         )
 
+    @property
+    def available(self):
+        """Return if accessory is available."""
+        state = self.hass.states.get(self.entity_id)
+        return state is not None and state.state != STATE_UNAVAILABLE
+
     async def run(self):
         """Handle accessory driver started event.
 
@@ -334,9 +352,11 @@ class HomeAccessory(Accessory):
         Run inside the Home Assistant event loop.
         """
         state = self.hass.states.get(self.entity_id)
-        self.async_update_state_callback(None, None, state)
-        async_track_state_change(
-            self.hass, self.entity_id, self.async_update_state_callback
+        self.async_update_state_callback(state)
+        self._subscriptions.append(
+            async_track_state_change_event(
+                self.hass, [self.entity_id], self.async_update_event_state_callback
+            )
         )
 
         battery_charging_state = None
@@ -349,33 +369,38 @@ class HomeAccessory(Accessory):
             battery_charging_state = linked_battery_sensor_state.attributes.get(
                 ATTR_BATTERY_CHARGING
             )
-            async_track_state_change(
-                self.hass,
-                self.linked_battery_sensor,
-                self.async_update_linked_battery_callback,
+            self._subscriptions.append(
+                async_track_state_change_event(
+                    self.hass,
+                    [self.linked_battery_sensor],
+                    self.async_update_linked_battery_callback,
+                )
             )
-        else:
+        elif state is not None:
             battery_state = state.attributes.get(ATTR_BATTERY_LEVEL)
         if self.linked_battery_charging_sensor:
-            battery_charging_state = (
-                self.hass.states.get(self.linked_battery_charging_sensor).state
-                == STATE_ON
+            state = self.hass.states.get(self.linked_battery_charging_sensor)
+            battery_charging_state = state and state.state == STATE_ON
+            self._subscriptions.append(
+                async_track_state_change_event(
+                    self.hass,
+                    [self.linked_battery_charging_sensor],
+                    self.async_update_linked_battery_charging_callback,
+                )
             )
-            async_track_state_change(
-                self.hass,
-                self.linked_battery_charging_sensor,
-                self.async_update_linked_battery_charging_callback,
-            )
-        elif battery_charging_state is None:
+        elif battery_charging_state is None and state is not None:
             battery_charging_state = state.attributes.get(ATTR_BATTERY_CHARGING)
 
         if battery_state is not None or battery_charging_state is not None:
             self.async_update_battery(battery_state, battery_charging_state)
 
     @ha_callback
-    def async_update_state_callback(
-        self, entity_id=None, old_state=None, new_state=None
-    ):
+    def async_update_event_state_callback(self, event):
+        """Handle state change event listener callback."""
+        self.async_update_state_callback(event.data.get("new_state"))
+
+    @ha_callback
+    def async_update_state_callback(self, new_state):
         """Handle state change listener callback."""
         _LOGGER.debug("New_state: %s", new_state)
         if new_state is None:
@@ -397,10 +422,11 @@ class HomeAccessory(Accessory):
         self.async_update_state(new_state)
 
     @ha_callback
-    def async_update_linked_battery_callback(
-        self, entity_id=None, old_state=None, new_state=None
-    ):
+    def async_update_linked_battery_callback(self, event):
         """Handle linked battery sensor state change listener callback."""
+        new_state = event.data.get("new_state")
+        if new_state is None:
+            return
         if self.linked_battery_charging_sensor:
             battery_charging_state = None
         else:
@@ -408,10 +434,11 @@ class HomeAccessory(Accessory):
         self.async_update_battery(new_state.state, battery_charging_state)
 
     @ha_callback
-    def async_update_linked_battery_charging_callback(
-        self, entity_id=None, old_state=None, new_state=None
-    ):
+    def async_update_linked_battery_charging_callback(self, event):
         """Handle linked battery charging sensor state change listener callback."""
+        new_state = event.data.get("new_state")
+        if new_state is None:
+            return
         self.async_update_battery(None, new_state.state == STATE_ON)
 
     @ha_callback
@@ -469,9 +496,18 @@ class HomeAccessory(Accessory):
             ATTR_SERVICE: service,
             ATTR_VALUE: value,
         }
+        context = Context()
 
-        self.hass.bus.async_fire(EVENT_HOMEKIT_CHANGED, event_data)
-        await self.hass.services.async_call(domain, service, service_data)
+        self.hass.bus.async_fire(EVENT_HOMEKIT_CHANGED, event_data, context=context)
+        await self.hass.services.async_call(
+            domain, service, service_data, context=context
+        )
+
+    @ha_callback
+    def async_stop(self):
+        """Cancel any subscriptions when the bridge is stopped."""
+        while self._subscriptions:
+            self._subscriptions.pop(0)()
 
 
 class HomeBridge(Bridge):

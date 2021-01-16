@@ -3,11 +3,10 @@
         "abort": {
             "all_configured": "Tutti i server collegati sono gi\u00e0 configurati",
             "already_configured": "Questo server Plex \u00e8 gi\u00e0 configurato",
-            "already_in_progress": "Plex \u00e8 in fase di configurazione",
-            "invalid_import": "La configurazione importata non \u00e8 valida",
-            "non-interactive": "Importazione non interattiva",
+            "already_in_progress": "Il flusso di configurazione \u00e8 gi\u00e0 in corso",
+            "reauth_successful": "La riautenticazione ha avuto successo",
             "token_request_timeout": "Timeout per l'ottenimento del token",
-            "unknown": "Non riuscito per motivo sconosciuto"
+            "unknown": "Errore imprevisto"
         },
         "error": {
             "faulty_credentials": "Autorizzazione non riuscita, verificare il Token",
@@ -16,12 +15,13 @@
             "not_found": "Server Plex non trovato",
             "ssl_error": "Problema con il certificato SSL"
         },
+        "flow_title": "{name} ({host})",
         "step": {
             "manual_setup": {
                 "data": {
-                    "host": "Host (opzionale se si \u00e8 fornito un Token)",
+                    "host": "Host",
                     "port": "Porta",
-                    "ssl": "Utilizzare SSL",
+                    "ssl": "Utilizza un certificato SSL",
                     "token": "Token (opzionale)",
                     "verify_ssl": "Verificare il certificato SSL"
                 },
@@ -33,10 +33,6 @@
                 },
                 "description": "Sono disponibili pi\u00f9 server, selezionarne uno:",
                 "title": "Selezionare il server Plex"
-            },
-            "start_website_auth": {
-                "description": "Continuare ad autorizzare su plex.tv.",
-                "title": "Collegare il server Plex"
             },
             "user": {
                 "description": "Continuare su [plex.tv](https://plex.tv) per collegare un server Plex.",

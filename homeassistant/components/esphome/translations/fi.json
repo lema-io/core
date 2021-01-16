@@ -6,7 +6,10 @@
         "flow_title": "ESPHome: {name}",
         "step": {
             "user": {
-                "title": "[%key:component::esphome::title%]"
+                "data": {
+                    "host": "Palvelin",
+                    "port": "Portti"
+                }
             }
         }
     }

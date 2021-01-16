@@ -1,14 +1,15 @@
 """Test Google report state."""
+from unittest.mock import AsyncMock, patch
+
 from homeassistant.components.google_assistant import error, report_state
 from homeassistant.util.dt import utcnow
 
 from . import BASIC_CONFIG
 
-from tests.async_mock import AsyncMock, patch
 from tests.common import async_fire_time_changed
 
 
-async def test_report_state(hass, caplog):
+async def test_report_state(hass, caplog, legacy_patchable_time):
     """Test report state works."""
     hass.states.async_set("light.ceiling", "off")
     hass.states.async_set("switch.ac", "on")
