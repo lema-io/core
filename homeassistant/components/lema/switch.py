@@ -27,7 +27,15 @@ from homeassistant.const import ATTR_NAME, DEVICE_DEFAULT_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
-CONST_DEFAULT_SCAN_PERIOD_S = 60.0
+CONST_DEFAULT_SCAN_PERIOD_S = 60
+
+# TODO figure out why entity_playform.py has self.scan_interval set to a string "7"
+# ...seconds.  It's used once on boot but then our switch async_setup_platform
+# completes and the exception never happens again.
+# Seems like a race condition on init or we neet to setup something else that
+# we are not doing.  See how platform is used in zwave.py
+# must have to do with vol.Optional(CONF_SCAN_INTERVAL): cv.string
+SCAN_INTERVAL = timedelta(seconds=CONST_DEFAULT_SCAN_PERIOD_S)
 
 CONST_COAP_PROTOCOL = "coap://"
 CONST_COAP_STRING_TRUE = "1"
@@ -58,6 +66,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     hass_switches.append(LEMAIOSwitch(host, "io/r1", protocol, config.get(CONF_FRIENDLY_NAME) + " - Outlet 1", False, None))
     hass_switches.append(LEMAIOSwitch(host, "io/r2", protocol, config.get(CONF_FRIENDLY_NAME) + " - Outlet 2", False, None))
 
+    # Add the entities
     async_add_entities(hass_switches)
 
     async def async_update_switches(event):
@@ -68,22 +77,29 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             await sw.async_update_values()
 
     # Call out an interval to poll data from CoAP endpoint
-    period_s = config.get(CONF_SCAN_INTERVAL)
-    if (period_s != None and float(period_s) > 0):
-        print("Switch using scan period from config: " + period_s)
-        scan_period = timedelta(seconds=float(period_s))
-    else:
-        print("Switch using default scan period of: " + str(CONST_DEFAULT_SCAN_PERIOD_S))
-        scan_period = timedelta(seconds=CONST_DEFAULT_SCAN_PERIOD_S)
+    # period_s = config.get(CONF_SCAN_INTERVAL)
+    # if (period_s != None and float(period_s) > 0):
+    #     print("Switch using scan period from config: " + str(period_s))
+    #     scan_period = datetime.timedelta(seconds=float(period_s))
+    # else:
+    #     print("Switch using default scan period of: " + str(CONST_DEFAULT_SCAN_PERIOD_S))
+    #     scan_period = datetime.timedelta(seconds=CONST_DEFAULT_SCAN_PERIOD_S)
 
-    async_track_time_interval(hass, async_update_switches, scan_period)
-
+    #print("Note there's a silly exception shown here, but it's not actually an issue TODO... Type of scan_period = " + str(type(scan_period)))
+    
+    #datetime.timedelta(0,interval)
+    #interval = config.get(CONF_SCAN_INTERVAL) or timedelta(seconds=5)
+    
+    async_track_time_interval(hass, async_update_switches, timedelta(seconds=5))
 
 class LEMAIOSwitch(ToggleEntity):
     """Representation of a Digital Output."""
 
     def __init__(self, host, uri, protocol, name, unit, invert_logic):
         """Initialize the pin."""
+
+        print("Init LEMA switch = " + uri)
+
         self._host = host
         self._uri = uri
         self._name = name

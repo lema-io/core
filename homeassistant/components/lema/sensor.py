@@ -15,7 +15,7 @@ from homeassistant.const import (
     CONF_SCAN_INTERVAL,
     POWER_WATT,
     VOLT,
-    UNIT_PERCENTAGE,
+    PERCENTAGE,
     TIME_SECONDS,
     TEMP_CELSIUS,
     ENERGY_KILO_WATT_HOUR,
@@ -53,6 +53,8 @@ PLATFORM_SCHEMA = vol.All(
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up LEMA Off-Grid Unit."""
 
+    print("Set up LEMA Off-Grid Unit")
+
     host = config.get(CONF_HOST)
 
     # Use all sensors by default
@@ -72,12 +74,15 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     hass_sensors.append(LEMAOffGridSensor(host, "bat/w", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Watts", POWER_WATT, 0))
     hass_sensors.append(LEMAOffGridSensor(host, "bat/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Amps", "Amps", 1))
     hass_sensors.append(LEMAOffGridSensor(host, "bat/v", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Volts DC", VOLT, 1))
-    hass_sensors.append(LEMAOffGridSensor(host, "bat/a", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Amps", "Amps", 1))
-    hass_sensors.append(LEMAOffGridSensor(host, "bat/level_percent", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Level Percent", UNIT_PERCENTAGE, 1))
+    hass_sensors.append(LEMAOffGridSensor(host, "bat/level_percent", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Level Percent", PERCENTAGE, 1))
     hass_sensors.append(LEMAOffGridSensor(host, "bat/time_remaining_s", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Time Remaining", TIME_SECONDS, 0))
     hass_sensors.append(LEMAOffGridSensor(host, "bat/temperature_deg_c", protocol, config.get(CONF_FRIENDLY_NAME) + " - Battery Temperature", TEMP_CELSIUS, 1))
 
+    print("Adding LEMA sensors done")
+
     async_add_entities(hass_sensors)
+
+    print("async_add_entities done")
 
     async def async_update_sensors(event):
         """Update all the LEMA sensors."""
@@ -87,22 +92,24 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             await sensor.async_update_values()
 
     # Call out an interval to poll data from CoAP endpoint
-    period_s = config.get(CONF_SCAN_INTERVAL)
-    if (period_s != None and float(period_s) > 0):
-        print("Sensor using scan period from config: " + period_s)
-        scan_period = timedelta(seconds=float(period_s))
-    else:
-        print("Sensor using default scan period of: " + str(CONST_DEFAULT_SCAN_PERIOD_S))
-        scan_period = timedelta(seconds=CONST_DEFAULT_SCAN_PERIOD_S)
+    #period_s = config.get(CONF_SCAN_INTERVAL)
+    #if (period_s != None and float(period_s) > 0):
+    #    print("Sensor using scan period from config: " + str(period_s))
+    #    scan_period = timedelta(seconds=float(period_s))
+    #else:
+    #    print("Sensor using default scan period of: " + str(CONST_DEFAULT_SCAN_PERIOD_S))
+    #    scan_period = timedelta(seconds=CONST_DEFAULT_SCAN_PERIOD_S)
 
-    async_track_time_interval(hass, async_update_sensors, scan_period)
-
+    async_track_time_interval(hass, async_update_sensors, timedelta(seconds=5))
 
 class LEMAOffGridSensor(Entity):
     """Representation of a LEMA Off-Grid Solar Power Supply Sensor."""
 
     def __init__(self, host, uri, protocol, name, unit, round_places):
         """Initialize the sensor."""
+
+        print("Init Sensor " + uri)
+        
         self._uri = uri
         self._name = name
         self._unit = unit
@@ -135,6 +142,10 @@ class LEMAOffGridSensor(Entity):
     async def async_update_values(self):
         """Update this sensor."""
         try:
+
+            #print("Update2: " + self._uri)
+            #_LOGGER.info("Update: " + self._uri)
+
             request = Message(code=GET, uri=CONST_COAP_PROTOCOL + self._host + "/" + self._uri)
             response = await self._protocol.request(request).response
 
@@ -142,13 +153,13 @@ class LEMAOffGridSensor(Entity):
             if (self._state != float(response.payload)):
                 # Round result to make the ui look nice
                 self._state = round(float(response.payload), self._round_places)
-                _LOGGER.info("%s changed: %s - %r" % (self._uri, response.code, self._state))
+                #_LOGGER.info("%s changed: %s - %r" % (self._uri, response.code, self._state))
                 self.async_write_ha_state()
             else:
-                _LOGGER.info("%s no change... current value = %s" % (self._uri, self._state))
+               #_LOGGER.info("%s no change... current value = %s" % (self._uri, self._state))
 
         except Exception as e:
-            _LOGGER.info("Failed to GET resource: " + self._uri)
+            _LOGGER.info("Exception - Failed to GET resource: " + self._uri)
             _LOGGER.info(e)
 
     @property
